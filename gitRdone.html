@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .dragging {
+            opacity: 0.5;
+        }
+        .drop-target {
+            border: 2px dashed #fff;
+            background-color: rgba(255, 0, 0, 0.1);
+            min-height: 60px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col justify-center items-center h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto mb-6">
+        <h2 class="text-center font-bold text-xl mb-4">GitRdone</h2>
+        <div class="flex gap-4 justify-center mb-6">
+            <input type="text" id="new-task" placeholder="Idea" class="p-3 border rounded w-60 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-600">
+            <input type="text" id="new-priority" placeholder="Importance" class="p-3 border rounded w-60 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-blue-600">
+            <button class="bg-blue-900 text-white px-6 py-3 rounded-md hover:bg-blue-700" onclick="addTask()">+</button>
+        </div>
+    </div>
+
+    <div class="flex gap-8 w-full max-w-4xl mx-auto">
+        <div class="kanban-column bg-gray-800 p-4 rounded-lg w-80">
+            <h2 class="text-center font-bold text-xl mb-4">Next Up</h2>
+            <div class="task-list py-6" id="todo-list" ondrop="drop(event)" ondragover="allowDrop(event)">
+            </div>
+        </div>
+
+        <div class="kanban-column bg-gray-800 p-4 rounded-lg w-80">
+            <h2 class="text-center font-bold text-xl mb-4">The Grind</h2>
+            <div class="task-list py-6" id="in-progress-list" ondrop="drop(event)" ondragover="allowDrop(event)">
+            </div>
+        </div>
+
+        <div class="kanban-column bg-gray-800 p-4 rounded-lg w-80">
+            <h2 class="text-center font-bold text-xl mb-4">Looks like a dub</h2>
+            <div class="task-list py-6" id="done-list" ondrop="drop(event)" ondragover="allowDrop(event)">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let data = [
+            {id: "1", task: "Cook", status: "todo", sticker: "urgent"},
+            
+        ];
+
+        function addTask() {
+            const taskInput = document.getElementById('new-task');
+            const priorityInput = document.getElementById('new-priority');
+            const taskValue = taskInput.value.trim();
+            const priorityValue = priorityInput.value.trim();
+
+            if (taskValue !== '') {
+                const newTask = {
+                    id: String(data.length + 1),
+                    task: taskValue,
+                    status: "todo", // Default status is "todo"
+                    sticker: priorityValue || 'normal' // Default to "normal" if no priority is given
+                };
+                data.push(newTask);
+                taskInput.value = '';
+                priorityInput.value = '';
+                renderTasks();
+            }
+        }
+
+        // Detect 'Enter' key press on inputs
+        document.getElementById('new-task').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        document.getElementById('new-priority').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        function renderTasks() {
+            const todoColumn = document.getElementById('todo-list');
+            const inProgressColumn = document.getElementById('in-progress-list');
+            const doneColumn = document.getElementById('done-list');
+
+            todoColumn.innerHTML = '';
+            inProgressColumn.innerHTML = '';
+            doneColumn.innerHTML = '';
+
+            data.forEach(task => {
+                const taskElement = document.createElement('div');
+                taskElement.classList.add('task', 'p-4', 'mb-4', 'rounded-lg', 'cursor-pointer', 'w-full');
+                taskElement.id = `task${task.id}`;
+                taskElement.setAttribute('draggable', 'true');
+                taskElement.setAttribute('ondragstart', 'drag(event)');
+
+                if (task.status === 'todo') {
+                    taskElement.classList.add('bg-gray-700');
+                } else if (task.status === 'in-progress') {
+                    taskElement.classList.add('bg-gray-600');
+                } else if (task.status === 'done') {
+                    taskElement.classList.add('bg-gray-500');
+                }
+
+                taskElement.innerHTML = `
+                    <div class="flex justify-between">
+                        <span class="block">${task.task}</span>
+                        ${task.status === 'done' ? `<span class="text-blue-900 text-xl" onclick="deleteTask('${task.id}')">💣</span>` : ''}
+                    </div>
+                    <span class="block text-sm text-gray-300">${task.sticker === 'urgent' ? '🔥' : ''} ${task.sticker}</span>
+                `;
+                
+                if (task.status === 'todo') {
+                    todoColumn.appendChild(taskElement);
+                } else if (task.status === 'in-progress') {
+                    inProgressColumn.appendChild(taskElement);
+                } else if (task.status === 'done') {
+                    doneColumn.appendChild(taskElement);
+                }
+            });
+        }
+
+        function deleteTask(taskId) {
+            data = data.filter(task => task.id !== taskId);
+            renderTasks();
+        }
+
+        renderTasks();
+
+        function allowDrop(ev) {
+            ev.preventDefault();
+            const target = ev.target.closest('.kanban-column');
+            if (target && target.querySelector('.task-list').childElementCount === 0) {
+                target.classList.add('drop-target');
+            }
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("text", ev.target.id);
+            ev.target.classList.add("dragging");
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            const data = ev.dataTransfer.getData("text");
+            const draggedTask = document.getElementById(data);
+            const targetList = ev.target.closest('.task-list');
+
+            const columns = document.querySelectorAll('.kanban-column');
+            columns.forEach(col => col.classList.remove('drop-target'));
+
+            if (targetList && !targetList.contains(draggedTask)) {
+                targetList.appendChild(draggedTask);
+            }
+
+            draggedTask.classList.remove("dragging");
+
+            if (targetList.id === "todo-list") {
+                draggedTask.classList.remove("bg-gray-600", "bg-gray-500");
+                draggedTask.classList.add("bg-gray-700");
+                updateTaskStatus(draggedTask.id, "todo");
+            } else if (targetList.id === "in-progress-list") {
+                draggedTask.classList.remove("bg-gray-700", "bg-gray-500");
+                draggedTask.classList.add("bg-gray-600");
+                updateTaskStatus(draggedTask.id, "in-progress");
+            } else if (targetList.id === "done-list") {
+                draggedTask.classList.remove("bg-gray-700", "bg-gray-600");
+                draggedTask.classList.add("bg-gray-500");
+                updateTaskStatus(draggedTask.id, "done");
+            }
+        }
+
+        function updateTaskStatus(taskId, newStatus) {
+            const task = data.find(t => t.id === taskId.replace('task', ''));
+            if (task) {
+                task.status = newStatus;
+                renderTasks();  
+            }
+        }
+    </script>
+</body>
+</html>
